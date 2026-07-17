@@ -11,4 +11,9 @@ T* data;
 
 ## Docs
 
-TODO
+
+### Visualiser
+
+The visualiser is the only script with an external dependency.
+Ensure you have libsdl2 and libsdl2-dev
+
