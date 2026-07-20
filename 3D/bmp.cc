@@ -1,8 +1,8 @@
 #include "bmp.hh"
+#include <array>
 #include <cstdint>
 #include <fstream>
 #include <iostream>
-#include <ranges>
 #include <string>
 #include <vector>
 
@@ -97,3 +97,38 @@ auto Writer::write_bmp(const std::string &file_name,
 
   return true;
 }
+
+namespace Scaler {
+
+auto ImageScaler::get_new_image_size() -> std::pair<std::size_t, std::size_t> {
+  return {new_hoz_dim, new_vert_dim};
+}
+
+auto ImageScaler::get_pixel_buffer() -> std::vector<std::uint8_t> {
+  return alloced_pixel_buffer;
+}
+
+auto ImageScaler::assign_scaled_pixel_colour(std::size_t pixel_num,
+                                             std::array<std::uint8_t, 3> rgb)
+    -> void {
+  // First establish the x and y component of pixel_num
+  auto pixel_x = pixel_num % original_dimensions.first;
+  auto pixel_y = pixel_num / original_dimensions.first;
+
+  // Establish the base index in the new buffer
+  auto base_index =
+      pixel_y * (new_hoz_dim * 3 * image_scale) + (pixel_x * 3 * image_scale);
+
+  for (int y = 0; y < image_scale; y++) {
+    for (int x = 0; x < image_scale; x++) {
+      alloced_pixel_buffer[(base_index + (y * 3 * new_hoz_dim) + (x * 3)) + 0] =
+          rgb[0];
+      alloced_pixel_buffer[(base_index + (y * 3 * new_hoz_dim) + (x * 3)) + 1] =
+          rgb[1];
+      alloced_pixel_buffer[(base_index + (y * 3 * new_hoz_dim) + (x * 3)) + 2] =
+          rgb[2];
+    }
+  }
+}
+
+} // namespace Scaler

@@ -51,6 +51,35 @@ constexpr auto populate_colours_array(const FixedColourPoints &points)
 
 constexpr inline AllColours all_colours =
     populate_colours_array(fixed_colour_points);
+
+template <typename T> class ColourRange {
+  static_assert(std::is_arithmetic<T>::value,
+                "Template argument T to SliceTracker3D must pass "
+                "std::is_arithmetic_v<T>");
+
+public:
+  ColourRange(T lower_bound, T upper_bound)
+      : lower(lower_bound), upper(upper_bound) {}
+
+  auto get_colour(T &value) const -> std::array<std::uint8_t, 3> {
+    auto divisor = std::max(T{1}, upper - lower);
+    auto perc_through_range = value / divisor;
+
+    perc_through_range = value < lower   ? 0
+                         : value > upper ? 1
+                                         : perc_through_range;
+
+    auto relevant_colour =
+        Colours::all_colours[perc_through_range * Colours::all_colours.size()];
+
+    return relevant_colour;
+  }
+
+private:
+  T lower;
+  T upper;
+};
+
 } // namespace Colours
 /*
 // clang-format off
@@ -229,26 +258,28 @@ template <typename T, std::uint8_t Axis> class SliceTracker3D {
 
 public:
   SliceTracker3D(std::array<std::size_t, 3> block_size, std::size_t slice,
-                 std::string output_files_header,
-                 std::pair<std::size_t, std::size_t> output_size,
+                 std::string output_files_header, std::size_t hoz_output_size,
                  std::size_t graph_every_n)
       : block_size(block_size), slice(slice),
-        output_files_header(output_files_header), output_size(output_size),
-        graph_every_n(graph_every_n), num_calls(0) {};
+        output_files_header(output_files_header),
+        hoz_output_size(hoz_output_size), graph_every_n(graph_every_n),
+        num_calls(0) {};
 
-  auto generate_graph(T *flattened_data) -> bool;
+  auto generate_graph(T *flattened_data,
+                      const Colours::ColourRange<T> &colour_range) -> bool;
 
 private:
   std::array<std::size_t, 3> block_size;
   std::size_t slice;
   std::string output_files_header;
-  std::pair<std::size_t, std::size_t> output_size;
+  std::size_t hoz_output_size;
   std::size_t graph_every_n;
   std::size_t num_calls;
 };
 
 template <typename T, std::uint8_t Axis>
-auto SliceTracker3D<T, Axis>::generate_graph(T *flattened_block) -> bool {
+auto SliceTracker3D<T, Axis>::generate_graph(
+    T *flattened_block, const Colours::ColourRange<T> &colour_range) -> bool {
   auto shared_data = std::shared_ptr<T>(flattened_block, [](T *) {});
   auto slice_accessor =
       DomainSliceAccessor3D<T, Axis>(block_size, shared_data, slice);
@@ -263,27 +294,27 @@ auto SliceTracker3D<T, Axis>::generate_graph(T *flattened_block) -> bool {
       min_and_max.second = value;
   }
 
-  auto colour_range = T{min_and_max.second - min_and_max.first};
-
-  colour_range = std::abs(colour_range) < 1e-09 ? 1 : colour_range;
-
-  auto image_buffer = std::vector<std::uint8_t>{};
+  // auto image_buffer = std::vector<std::uint8_t>{};
 
   std::size_t pixel_index = 0;
 
+  auto image_scaled = Scaler::ImageScaler(slice_dims, hoz_output_size);
+
   for (auto value : slice_accessor) {
-    auto relevant_colour = Colours::all_colours[(value / colour_range) *
-                                                Colours::all_colours.size()];
+    auto relevant_colour = colour_range.get_colour(value);
+
     // It expects BGR
-    image_buffer.push_back(relevant_colour[2]);
-    image_buffer.push_back(relevant_colour[1]);
-    image_buffer.push_back(relevant_colour[0]);
+    image_scaled.assign_scaled_pixel_colour(
+        pixel_index,
+        {relevant_colour[2], relevant_colour[1], relevant_colour[0]});
 
     pixel_index++;
   }
 
   Writer::write_bmp(output_files_header + std::to_string(num_calls) + ".bmp",
-                    image_buffer, slice_dims.first, slice_dims.second);
+                    image_scaled.get_pixel_buffer(),
+                    image_scaled.get_new_image_size().first,
+                    image_scaled.get_new_image_size().second);
 
   std::cout << "Wrote state to "
             << output_files_header + std::to_string(num_calls) + ".bmp"
