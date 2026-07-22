@@ -40,9 +40,15 @@ int main() {
                    .count()
             << std::endl;
 
+  constexpr auto theoretical_cube_x = 750;
+  constexpr auto theoretical_cube_y = 250;
+  constexpr auto theoretical_cube_z = 250;
+
   auto faces =
       std::array<Cuboid::Face<double>, 3>{Cuboid::get_faces_of_cuboid<double>(
-          {{{100, 100}, {100, 100}, {100, 100}}})};
+          {{{theoretical_cube_x, theoretical_cube_y},
+            {theoretical_cube_z, theoretical_cube_y},
+            {theoretical_cube_z, theoretical_cube_x}}})};
 
   std::cout << "All Faces: " << std::endl;
   for (auto face : faces) {

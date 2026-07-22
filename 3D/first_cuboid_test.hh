@@ -119,9 +119,9 @@ auto get_faces_of_cuboid(
                   {T{0}, T{0}, faces[1].first},
                   {T{0}, faces[1].second, T{0}}},
           Face<T>{// WARN: May need to swap the first two lines
-                  {T{0}, faces[0].second, T{0}},
-                  {faces[2].second, T{0}, T{0}},
-                  {T{0}, T{0}, faces[2].first}}};
+                  {faces[2].second, faces[0].second, T{0}},
+                  {T{0}, T{0}, faces[2].first},
+                  {T{-1} * faces[2].second, T{0}, T{0}}}};
 }
 
 template <typename T>
@@ -132,20 +132,28 @@ auto get_position_camera(const std::array<Face<T>, 3> &faces) -> Camera<T> {
   auto max_hoz_distance = std::max(faces[0].a[0], faces[1].a[2]);
   auto shorter_hoz_distance = std::min(faces[0].a[0], faces[1].a[2]);
 
-  // WARN: Temporary -45 degree normalsied
-  // auto camera_angle = Vec3<T>{T{-1}, -0.25, T{1}};
-  auto camera_angle = Vec3<T>{-0.75, 0.5, 1};
+  auto camera_pos = Vec3<T>{2 * max_hoz_distance, 1.75 * faces[0].b[1],
+                            -1 * max_hoz_distance};
+
+  // INFO: try to set the direction to be the center of the thing
+  auto center_of_cuboid = Vec3<T>{
+      faces[0].a[0] / T{2},
+      faces[0].b[1] / T{2},
+      faces[1].a[2] / T{2},
+  };
+
+  std::cout << "CENTER OF CUBOID: " << stringVec(center_of_cuboid) << std::endl;
+
+  auto camera_angle = center_of_cuboid - camera_pos;
 
   auto mod = std::sqrt(camera_angle[0] * camera_angle[0] +
                        camera_angle[1] * camera_angle[1] +
                        camera_angle[2] * camera_angle[2]);
 
-  camera_angle = {camera_angle[0] / mod, camera_angle[1] / mod,
+  camera_angle = {camera_angle[0] / mod, -1 * camera_angle[1] / mod,
                   camera_angle[2] / mod};
 
-  return Camera<T>{
-      {max_hoz_distance * 2, 1.25 * faces[0].b[1], -2 * shorter_hoz_distance},
-      camera_angle};
+  return Camera<T>{camera_pos, camera_angle};
 }
 
 template <typename T>
@@ -184,8 +192,10 @@ auto get_pixel_buffer(std::pair<std::size_t, std::size_t> image_dimensions,
                  std::sqrt(camera.direction[0] * camera.direction[0] +
                            camera.direction[2] * camera.direction[2]));
 
-  std::cout << "Camera Yaw: " << camera_yaw << std::endl;
-  std::cout << "Camera Pitch: " << camera_pitch << std::endl;
+  std::cout << "Camera Yaw (deg): " << camera_yaw * 180 / 3.1415926535
+            << std::endl;
+  std::cout << "Camera Pitch (deg): " << camera_pitch * 180 / 3.1415926535
+            << std::endl;
 
   /*
    *
@@ -269,7 +279,7 @@ auto get_pixel_buffer(std::pair<std::size_t, std::size_t> image_dimensions,
       // Establish the line and determine if it hits an object
       for (auto face_i = 0; face_i < faces.size(); face_i++) {
 
-        auto face = faces[face_i];
+        auto face = Face<T>{faces[face_i]};
         auto face_n_and_d = pre_calculated_face_normals_and_ds[face_i];
 
         // Get the point of intersection
