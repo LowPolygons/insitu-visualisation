@@ -118,10 +118,11 @@ auto get_faces_of_cuboid(
           Face<T>{{faces[0].first, T{0}, T{0}},
                   {T{0}, T{0}, faces[1].first},
                   {T{0}, faces[1].second, T{0}}},
-          Face<T>{// WARN: May need to swap the first two lines
-                  {faces[2].second, faces[0].second, T{0}},
+          Face<T>{ // WARN: May need to swap the first two lines
+                  {/* faces[2].second */
+                   T{0}, faces[0].second, T{0}},
                   {T{0}, T{0}, faces[2].first},
-                  {T{-1} * faces[2].second, T{0}, T{0}}}};
+                  {/* T{-1} * */ faces[2].second, T{0}, T{0}}}};
 }
 
 template <typename T>
@@ -132,8 +133,10 @@ auto get_position_camera(const std::array<Face<T>, 3> &faces) -> Camera<T> {
   auto max_hoz_distance = std::max(faces[0].a[0], faces[1].a[2]);
   auto shorter_hoz_distance = std::min(faces[0].a[0], faces[1].a[2]);
 
-  auto camera_pos = Vec3<T>{2 * max_hoz_distance, 1.75 * faces[0].b[1],
-                            -1 * max_hoz_distance};
+  auto distance_multipler = 0.8;
+  auto camera_pos =
+      distance_multipler * Vec3<T>{2 * max_hoz_distance, 1.75 * faces[0].b[1],
+                                   -1 * max_hoz_distance};
 
   // INFO: try to set the direction to be the center of the thing
   auto center_of_cuboid = Vec3<T>{
@@ -157,8 +160,11 @@ auto get_position_camera(const std::array<Face<T>, 3> &faces) -> Camera<T> {
 }
 
 template <typename T>
-auto get_pixel_buffer(std::pair<std::size_t, std::size_t> image_dimensions,
-                      Camera<T> camera, std::array<Face<T>, 3> faces)
+auto get_pixel_buffer(
+    std::pair<std::size_t, std::size_t> image_dimensions, Camera<T> camera,
+    std::array<Face<T>, 3> faces,
+    const std::array<std::vector<std::uint8_t>, 3> &image_buffers,
+    const std::array<std::pair<std::size_t, std::size_t>, 3> &image_buffer_dims)
     -> std::vector<std::uint8_t> {
   /*
    * Initialise the pixel buffer
@@ -234,6 +240,11 @@ auto get_pixel_buffer(std::pair<std::size_t, std::size_t> image_dimensions,
           {calculate_normal_and_d_of_face(faces[0]),
            calculate_normal_and_d_of_face(faces[1]),
            calculate_normal_and_d_of_face(faces[2])}};
+
+  std::cout << "Image actual dimensions" << std::endl;
+  for (auto thing : image_buffer_dims) {
+    std::cout << thing.first << " x " << thing.second << std::endl;
+  }
   /*
    *
    * Main computation
@@ -275,6 +286,7 @@ auto get_pixel_buffer(std::pair<std::size_t, std::size_t> image_dimensions,
                          rotated_dir_vec[2] / dir_vec_mod};
 
       auto has_hit_object = -1;
+      auto lambda_mu = std::pair<std::size_t, size_t>{0, 0};
 
       // Establish the line and determine if it hits an object
       for (auto face_i = 0; face_i < faces.size(); face_i++) {
@@ -306,23 +318,6 @@ auto get_pixel_buffer(std::pair<std::size_t, std::size_t> image_dimensions,
         // Determine if it actually lies in the Face
         auto indexes = relevant_coords_per_plane[face_i];
 
-        if (pixel_x == 500 && pixel_y == 500) {
-          std::cout << "///////////////////" << std::endl;
-          std::cout << "INDEX: " << face_i
-                    << ", P.o.I: " << stringVec(point_of_intersection)
-                    << std::endl;
-          std::cout << "A: " << stringVec(a) << std::endl;
-          std::cout << "Lambda: " << lambda << std::endl;
-          std::cout << "B: " << stringVec(b) << std::endl;
-
-          std::cout << point_of_intersection[indexes.first] << " against "
-                    << std::abs(face.a[indexes.first]) << std::endl;
-          std::cout << point_of_intersection[indexes.second] << " against "
-                    << std::abs(face.b[indexes.second]) << std::endl;
-
-          std::cout << "///////////////////" << std::endl;
-        }
-
         auto local_point_on_surface = point_of_intersection;
 
         if (local_point_on_surface[indexes.first] <= 0 ||
@@ -337,34 +332,31 @@ auto get_pixel_buffer(std::pair<std::size_t, std::size_t> image_dimensions,
 
         // Has hit an object
         has_hit_object = face_i;
+        lambda_mu = {local_point_on_surface[indexes.first],
+                     local_point_on_surface[indexes.second]};
         break;
       }
 
       if (has_hit_object != -1) {
-        switch (has_hit_object) {
-        case 0: {
-          pixel_buffer.emplace_back(10);
-          pixel_buffer.emplace_back(10);
-          pixel_buffer.emplace_back(10);
-          break;
-        }
-        case 1: {
-          pixel_buffer.emplace_back(100);
-          pixel_buffer.emplace_back(200);
-          pixel_buffer.emplace_back(100);
-          break;
-        }
-        case 2: {
-          pixel_buffer.emplace_back(200);
-          pixel_buffer.emplace_back(200);
-          pixel_buffer.emplace_back(200);
-          break;
-        }
-        }
+        pixel_buffer.push_back(
+            image_buffers[has_hit_object]
+                         [(static_cast<std::size_t>(lambda_mu.first) *
+                           image_buffer_dims[has_hit_object].first * 3) +
+                          (3 * lambda_mu.second) + 0]);
+        pixel_buffer.push_back(
+            image_buffers[has_hit_object]
+                         [(static_cast<std::size_t>(lambda_mu.first) *
+                           image_buffer_dims[has_hit_object].first * 3) +
+                          (3 * lambda_mu.second) + 1]);
+        pixel_buffer.push_back(
+            image_buffers[has_hit_object]
+                         [(static_cast<std::size_t>(lambda_mu.first) *
+                           image_buffer_dims[has_hit_object].first * 3) +
+                          (3 * lambda_mu.second) + 2]);
       } else {
-        pixel_buffer.emplace_back(255);
-        pixel_buffer.emplace_back(255);
-        pixel_buffer.emplace_back(255);
+        pixel_buffer.emplace_back(120);
+        pixel_buffer.emplace_back(120);
+        pixel_buffer.emplace_back(120);
       }
     }
   }

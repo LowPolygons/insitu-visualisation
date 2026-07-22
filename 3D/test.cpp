@@ -13,20 +13,46 @@ int main() {
   auto data_alloc_start = std::chrono::steady_clock::now();
   std::array<std::size_t, 3> dims = {300, 300, 300};
 
-  for (int i = 0; i < dims[0] * dims[1] * dims[2]; i++)
-    data.push_back(i);
+  for (int z = dims[2]; z > 0; z--) {
+    for (int y = dims[1]; y > 0; y--) {
+      for (int x = dims[0]; x > 0; x--) {
+        data.push_back(static_cast<double>(x * y * z));
+      }
+    }
+  }
+  // for (int i = 0; i < dims[0] * dims[1] * dims[2]; i++)
+  //   data.push_back(i);
+
   auto data_alloc_end = std::chrono::steady_clock::now();
 
-  auto tracker_x = Insitu::SliceTracker3D<double, 0>(dims, 0, "x.bmp", 3, 1);
-  auto tracker_y = Insitu::SliceTracker3D<double, 1>(dims, 0, "y.bmp", 3, 1);
-  auto tracker_z = Insitu::SliceTracker3D<double, 2>(dims, 150, "z.bmp", 3, 1);
-  auto colour_range = Colours::ColourRange<double>(0.0, 300 * 300 * 300);
+  auto tracker_x = Insitu::SliceTracker3D<double, 0>(dims, 0, "x.bmp", 1, 1);
+  auto tracker_y = Insitu::SliceTracker3D<double, 1>(dims, 0, "y.bmp", 1, 1);
+  auto tracker_z = Insitu::SliceTracker3D<double, 2>(dims, 0, "z.bmp", 1, 1);
+  auto colour_range =
+      Colours::ColourRange<double>(data[data.size() - 1], data[0]);
 
   auto generate_start = std::chrono::steady_clock::now();
-  tracker_x.generate_graph(data.data(), colour_range);
-  tracker_y.generate_graph(data.data(), colour_range);
-  tracker_z.generate_graph(data.data(), colour_range);
+
+  auto x_image = tracker_x.generate_graph(data.data(), colour_range).value();
+  auto y_image = tracker_y.generate_graph(data.data(), colour_range).value();
+  auto z_image = tracker_z.generate_graph(data.data(), colour_range).value();
+
   auto generate_end = std::chrono::steady_clock::now();
+
+  auto rasteriser_start = std::chrono::steady_clock::now();
+
+  auto faces =
+      std::array<Cuboid::Face<double>, 3>{Cuboid::get_faces_of_cuboid<double>(
+          {{{dims[0], dims[1]}, {dims[2], dims[1]}, {dims[2], dims[0]}}})};
+
+  auto camera = Cuboid::get_position_camera(faces);
+  auto test_buffer = Cuboid::get_pixel_buffer(
+      {1000, 1000}, camera, faces, {z_image, x_image, y_image},
+      {{{300, 300}, {300, 300}, {300, 300}}});
+
+  Writer::write_bmp("EXAMPLE", test_buffer, 1000, 1000);
+
+  auto rasteriser_end = std::chrono::steady_clock::now();
 
   std::cout << "Array Population (ms): "
             << std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -39,28 +65,9 @@ int main() {
                    generate_end - generate_start)
                    .count()
             << std::endl;
-
-  constexpr auto theoretical_cube_x = 750;
-  constexpr auto theoretical_cube_y = 250;
-  constexpr auto theoretical_cube_z = 250;
-
-  auto faces =
-      std::array<Cuboid::Face<double>, 3>{Cuboid::get_faces_of_cuboid<double>(
-          {{{theoretical_cube_x, theoretical_cube_y},
-            {theoretical_cube_z, theoretical_cube_y},
-            {theoretical_cube_z, theoretical_cube_x}}})};
-
-  std::cout << "All Faces: " << std::endl;
-  for (auto face : faces) {
-    Cuboid::printFace(face);
-  }
-
-  auto camera = Cuboid::get_position_camera(faces);
-
-  std::cout << Cuboid::stringVec(camera.origin) << std::endl;
-  std::cout << Cuboid::stringVec(camera.direction) << std::endl;
-
-  auto test_buffer = Cuboid::get_pixel_buffer({1000, 1000}, camera, faces);
-
-  Writer::write_bmp("EXAMPLE", test_buffer, 1000, 1000);
+  std::cout << "Rasteriser Image Generation (ms): "
+            << std::chrono::duration_cast<std::chrono::milliseconds>(
+                   rasteriser_end - rasteriser_start)
+                   .count()
+            << std::endl;
 }

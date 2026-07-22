@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <string>
 #include <tuple>
 #include <type_traits>
@@ -266,7 +267,8 @@ public:
         num_calls(0) {};
 
   auto generate_graph(T *flattened_data,
-                      const Colours::ColourRange<T> &colour_range) -> bool;
+                      const Colours::ColourRange<T> &colour_range)
+      -> std::optional<std::vector<std::uint8_t>>;
 
 private:
   std::array<std::size_t, 3> block_size;
@@ -279,7 +281,8 @@ private:
 
 template <typename T, std::uint8_t Axis>
 auto SliceTracker3D<T, Axis>::generate_graph(
-    T *flattened_block, const Colours::ColourRange<T> &colour_range) -> bool {
+    T *flattened_block, const Colours::ColourRange<T> &colour_range)
+    -> std::optional<std::vector<std::uint8_t>> {
   auto shared_data = std::shared_ptr<T>(flattened_block, [](T *) {});
   auto slice_accessor =
       DomainSliceAccessor3D<T, Axis>(block_size, shared_data, slice);
@@ -321,7 +324,7 @@ auto SliceTracker3D<T, Axis>::generate_graph(
             << std::endl;
 
   num_calls++;
-  return true;
+  return image_scaled.get_pixel_buffer();
 }
 
 } // namespace Insitu
