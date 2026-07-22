@@ -75,14 +75,19 @@ auto Writer::write_bmp(const std::string &file_name,
 
   //==// Pixel data in BGR(P) Format //==//
 
-  // std::cout << " ADDING PIXEL DATA " << std::endl;
-  for (auto pixel = std::size_t{0}; pixel < width * height; pixel++) {
-    // R G B A -> B G R A
-    // always (pixel*4) + 0, 1, 2, 3
-    file_bytes.push_back(pixel_buffer[(pixel * 3) + 0]);
-    file_bytes.push_back(pixel_buffer[(pixel * 3) + 1]);
-    file_bytes.push_back(pixel_buffer[(pixel * 3) + 2]);
-    file_bytes.push_back(255);
+  for (auto row = 0; row < height; row++) {
+    auto inverted_row = height - (1 + row);
+    for (auto col = std::size_t{0}; col < width; col++) {
+      // R G B A -> B G R A
+      // always (pixel*4) + 0, 1, 2, 3
+      file_bytes.push_back(
+          pixel_buffer[(inverted_row * 3 * width) + (col * 3) + 0]);
+      file_bytes.push_back(
+          pixel_buffer[(inverted_row * 3 * width) + (col * 3) + 1]);
+      file_bytes.push_back(
+          pixel_buffer[(inverted_row * 3 * width) + (col * 3) + 2]);
+      file_bytes.push_back(255);
+    }
   }
 
   //==// Open the file in binary-write and save //==//
