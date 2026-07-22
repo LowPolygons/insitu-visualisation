@@ -33,12 +33,11 @@ The following Slices are the 0th slice
 
 | X | Y | Z |
 |----------|----------|----------|
-| ![X_Slice](x.bmp0.bmp) | ![Y_Slice](y.bmp0.bmp) | ![Z_Slice](z.bmp0.bmp) |
+| ![X_Slice](x_slice0.bmp) | ![Y_Slice](y_slice0.bmp) | ![Z_Slice](z_slice0.bmp) |
 
 ### Current 3D Cuboid Render
 
-![Render](EXAMPLE)
-
+![Render](3d_render.bmp)
 
 
 ## Other Issues

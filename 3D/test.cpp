@@ -25,9 +25,9 @@ int main() {
 
   auto data_alloc_end = std::chrono::steady_clock::now();
 
-  auto tracker_x = Insitu::SliceTracker3D<double, 0>(dims, 0, "x.bmp", 1, 1);
-  auto tracker_y = Insitu::SliceTracker3D<double, 1>(dims, 0, "y.bmp", 1, 1);
-  auto tracker_z = Insitu::SliceTracker3D<double, 2>(dims, 0, "z.bmp", 1, 1);
+  auto tracker_x = Insitu::SliceTracker3D<double, 0>(dims, 0, "x_slice", 1, 1);
+  auto tracker_y = Insitu::SliceTracker3D<double, 1>(dims, 0, "y_slice", 1, 1);
+  auto tracker_z = Insitu::SliceTracker3D<double, 2>(dims, 0, "z_slice", 1, 1);
   auto colour_range =
       Colours::ColourRange<double>(data[data.size() - 1], data[0]);
 
@@ -50,7 +50,7 @@ int main() {
       {1000, 1000}, camera, faces, {z_image, x_image, y_image},
       {{{300, 300}, {300, 300}, {300, 300}}});
 
-  Writer::write_bmp("EXAMPLE", test_buffer, 1000, 1000);
+  Writer::write_bmp("3d_render.bmp", test_buffer, 1000, 1000);
 
   auto rasteriser_end = std::chrono::steady_clock::now();
 
