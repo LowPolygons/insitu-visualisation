@@ -1,4 +1,6 @@
 #include "3D_slice_tracker.hh"
+#include "bmp.hh"
+#include "first_cuboid_test.hh"
 #include <array>
 #include <chrono>
 #include <cstddef>
@@ -37,4 +39,22 @@ int main() {
                    generate_end - generate_start)
                    .count()
             << std::endl;
+
+  auto faces =
+      std::array<Cuboid::Face<double>, 3>{Cuboid::get_faces_of_cuboid<double>(
+          {{{100, 100}, {100, 100}, {100, 100}}})};
+
+  std::cout << "All Faces: " << std::endl;
+  for (auto face : faces) {
+    Cuboid::printFace(face);
+  }
+
+  auto camera = Cuboid::get_position_camera(faces);
+
+  std::cout << Cuboid::stringVec(camera.origin) << std::endl;
+  std::cout << Cuboid::stringVec(camera.direction) << std::endl;
+
+  auto test_buffer = Cuboid::get_pixel_buffer({1000, 1000}, camera, faces);
+
+  Writer::write_bmp("EXAMPLE", test_buffer, 1000, 1000);
 }
