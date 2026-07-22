@@ -9,10 +9,10 @@
 #include <vector>
 
 int main() {
-  std::vector<double> data;
-
   auto data_alloc_start = std::chrono::steady_clock::now();
-  std::array<std::size_t, 3> dims = {300, 300, 300};
+
+  std::vector<double> data;
+  std::array<std::size_t, 3> dims = {432, 500, 750};
 
   for (int z = dims[2]; z > 0; z--) {
     for (int y = 0; y < dims[1]; y++) {

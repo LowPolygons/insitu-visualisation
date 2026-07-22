@@ -105,7 +105,7 @@ auto get_faces_of_cuboid(const std::array<std::size_t, 3> &dims)
   // coefficient
 
   return {
-      Face<T>{{T{0}, T{0}, T{0}}, {dims[0], T{0}, T{0}}, {T{0}, dims[1], T{0}}},
+      Face<T>{{T{0}, T{0}, T{0}}, {T{0}, dims[1], T{0}}, {dims[0], T{0}, T{0}}},
       Face<T>{
           {dims[0], T{0}, T{0}}, {T{0}, dims[1], T{0}}, {T{0}, T{0}, dims[2]}},
       Face<T>{ // WARN: May need to swap the first two lines
@@ -261,7 +261,7 @@ auto get_pixel_buffer(
    */
   constexpr auto relevant_coords_per_plane =
       std::array<std::pair<std::size_t, std::size_t>, 3>{{
-          {0, 1},
+          {1, 0},
           {1, 2},
           {2, 0},
       }};
@@ -368,7 +368,7 @@ auto get_pixel_buffer(
         // Determine if it actually lies in the Face
         auto indexes = relevant_coords_per_plane[face_i];
 
-        auto local_point_on_surface = point_of_intersection;
+        auto local_point_on_surface = point_of_intersection - face.origin;
 
         if (local_point_on_surface[indexes.first] <= 0 ||
             local_point_on_surface[indexes.first] >
@@ -388,6 +388,28 @@ auto get_pixel_buffer(
       }
 
       if (has_hit_object != -1) {
+        if (has_hit_object == 0) {
+          // std::cout << "u=" << lambda_mu.first << " v=" << lambda_mu.second
+          //           << " index="
+          //           << (static_cast<size_t>(lambda_mu.first) *
+          //                   image_buffer_dims[0].first +
+          //               static_cast<size_t>(lambda_mu.second))
+          //           << '\n';
+          // std::cout << "[" << pixel_x << ", " << pixel_y
+          //           << "] : " << lambda_mu.first << ", " << lambda_mu.second
+          //           << " [===] " << image_buffer_dims[0].first << ", "
+          //           << image_buffer_dims[0].second << " <=> "
+          //           << image_buffers[0].size() << " and lastly "
+          //           << (static_cast<std::size_t>(lambda_mu.first) *
+          //               image_buffer_dims[has_hit_object].first * 3) +
+          //                  (3 * lambda_mu.second)
+          //           << std::endl;
+          //
+          // pixel_buffer.emplace_back(255);
+          // pixel_buffer.emplace_back(255);
+          // pixel_buffer.emplace_back(255);
+        }
+        // else {
         pixel_buffer.push_back(
             image_buffers[has_hit_object]
                          [(static_cast<std::size_t>(lambda_mu.first) *
@@ -403,6 +425,7 @@ auto get_pixel_buffer(
                          [(static_cast<std::size_t>(lambda_mu.first) *
                            image_buffer_dims[has_hit_object].first * 3) +
                           (3 * lambda_mu.second) + 2]);
+        // }
       } else {
         pixel_buffer.emplace_back(120);
         pixel_buffer.emplace_back(120);
