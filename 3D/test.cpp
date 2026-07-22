@@ -5,6 +5,7 @@
 #include <chrono>
 #include <cstddef>
 #include <iostream>
+#include <ostream>
 #include <vector>
 
 int main() {
@@ -14,41 +15,61 @@ int main() {
   std::array<std::size_t, 3> dims = {300, 300, 300};
 
   for (int z = dims[2]; z > 0; z--) {
-    for (int y = dims[1]; y > 0; y--) {
-      for (int x = dims[0]; x > 0; x--) {
+    for (int y = 0; y < dims[1]; y++) {
+      for (int x = 0; x < dims[0]; x++) {
         data.push_back(static_cast<double>(x * y * z));
       }
     }
   }
+  // for (int z = dims[2]; z > 0; z--) {
+  //   for (int y = dims[1]; y > 0; y--) {
+  //     for (int x = dims[0]; x > 0; x--) {
+  //       data.push_back(static_cast<double>(x * y * z));
+  //     }
+  //   }
+  // }
   // for (int i = 0; i < dims[0] * dims[1] * dims[2]; i++)
   //   data.push_back(i);
 
   auto data_alloc_end = std::chrono::steady_clock::now();
 
-  auto tracker_x = Insitu::SliceTracker3D<double, 0>(dims, 0, "x_slice", 1, 1);
-  auto tracker_y = Insitu::SliceTracker3D<double, 1>(dims, 0, "y_slice", 1, 1);
+  auto tracker_x =
+      Insitu::SliceTracker3D<double, 0>(dims, dims[0] - 1, "x_slice", 1, 1);
+  auto tracker_y =
+      Insitu::SliceTracker3D<double, 1>(dims, dims[1] - 1, "y_slice", 1, 1);
   auto tracker_z = Insitu::SliceTracker3D<double, 2>(dims, 0, "z_slice", 1, 1);
   auto colour_range =
-      Colours::ColourRange<double>(data[data.size() - 1], data[0]);
+      Colours::ColourRange<double>(0.0, dims[0] * dims[1] * dims[2]);
 
   auto generate_start = std::chrono::steady_clock::now();
 
-  auto x_image = tracker_x.generate_graph(data.data(), colour_range).value();
-  auto y_image = tracker_y.generate_graph(data.data(), colour_range).value();
-  auto z_image = tracker_z.generate_graph(data.data(), colour_range).value();
+  auto x_image_and_x_dims =
+      tracker_x.generate_graph(data.data(), colour_range).value();
+  auto y_image_and_y_dims =
+      tracker_y.generate_graph(data.data(), colour_range).value();
+  auto z_image_and_z_dims =
+      tracker_z.generate_graph(data.data(), colour_range).value();
 
   auto generate_end = std::chrono::steady_clock::now();
 
   auto rasteriser_start = std::chrono::steady_clock::now();
 
-  auto faces =
-      std::array<Cuboid::Face<double>, 3>{Cuboid::get_faces_of_cuboid<double>(
-          {{{dims[0], dims[1]}, {dims[2], dims[1]}, {dims[2], dims[0]}}})};
+  auto faces = std::array<Cuboid::Face<double>, 3>{
+      Cuboid::get_faces_of_cuboid<double>(dims)};
 
-  auto camera = Cuboid::get_position_camera(faces);
+  auto camera = Cuboid::get_position_camera<double>(dims);
+  // auto camera = Cuboid::get_position_camera(faces);
+
+  std::cout << "Camera: " << std::endl;
+  std::cout << " O - " << Cuboid::stringVec(camera.origin) << std::endl;
+  std::cout << " D - " << Cuboid::stringVec(camera.direction) << std::endl;
+
   auto test_buffer = Cuboid::get_pixel_buffer(
-      {1000, 1000}, camera, faces, {z_image, x_image, y_image},
-      {{{300, 300}, {300, 300}, {300, 300}}});
+      {1000, 1000}, camera, faces,
+      {std::get<0>(z_image_and_z_dims), std::get<0>(x_image_and_x_dims),
+       std::get<0>(y_image_and_y_dims)},
+      {std::get<1>(z_image_and_z_dims), std::get<1>(x_image_and_x_dims),
+       std::get<1>(y_image_and_y_dims)});
 
   Writer::write_bmp("3d_render.bmp", test_buffer, 1000, 1000);
 

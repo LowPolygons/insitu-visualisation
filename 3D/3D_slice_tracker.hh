@@ -268,7 +268,8 @@ public:
 
   auto generate_graph(T *flattened_data,
                       const Colours::ColourRange<T> &colour_range)
-      -> std::optional<std::vector<std::uint8_t>>;
+      -> std::optional<std::tuple<std::vector<std::uint8_t>,
+                                  std::pair<std::size_t, std::size_t>>>;
 
 private:
   std::array<std::size_t, 3> block_size;
@@ -282,7 +283,8 @@ private:
 template <typename T, std::uint8_t Axis>
 auto SliceTracker3D<T, Axis>::generate_graph(
     T *flattened_block, const Colours::ColourRange<T> &colour_range)
-    -> std::optional<std::vector<std::uint8_t>> {
+    -> std::optional<std::tuple<std::vector<std::uint8_t>,
+                                std::pair<std::size_t, std::size_t>>> {
   auto shared_data = std::shared_ptr<T>(flattened_block, [](T *) {});
   auto slice_accessor =
       DomainSliceAccessor3D<T, Axis>(block_size, shared_data, slice);
@@ -297,8 +299,6 @@ auto SliceTracker3D<T, Axis>::generate_graph(
       min_and_max.second = value;
   }
 
-  // auto image_buffer = std::vector<std::uint8_t>{};
-
   std::size_t pixel_index = 0;
 
   auto image_scaled = Scaler::ImageScaler(slice_dims, hoz_output_size);
@@ -306,7 +306,6 @@ auto SliceTracker3D<T, Axis>::generate_graph(
   for (auto value : slice_accessor) {
     auto relevant_colour = colour_range.get_colour(value);
 
-    // It expects BGR
     image_scaled.assign_scaled_pixel_colour(
         pixel_index,
         {relevant_colour[2], relevant_colour[1], relevant_colour[0]});
@@ -324,7 +323,7 @@ auto SliceTracker3D<T, Axis>::generate_graph(
             << std::endl;
 
   num_calls++;
-  return image_scaled.get_pixel_buffer();
+  return std::make_tuple(image_scaled.get_pixel_buffer(), slice_dims);
 }
 
 } // namespace Insitu

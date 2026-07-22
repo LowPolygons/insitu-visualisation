@@ -95,16 +95,8 @@ template <typename T> struct Camera {
   Vec3<T> direction;
 };
 
-/*
- * WARN: An assumption has to be made here about the order of the faces and how
- * theyve been inserted
- * - The first face will be parallel with the XY plane (vert lying)
- * - The second face will be parallel with the YZ plane (vert lying)
- * - The third will be parallel with the XZ plane (horiz lying)
- */
 template <typename T>
-auto get_faces_of_cuboid(
-    const std::array<std::pair<std::size_t, std::size_t>, 3> &faces)
+auto get_faces_of_cuboid(const std::array<std::size_t, 3> &dims)
     -> std::array<Face<T>, 3> {
   // The cuboid has its front left bottom corner on 0,0,0 and extends right in
   // the X, up the in the Y and forward in the Z
@@ -112,24 +104,82 @@ auto get_faces_of_cuboid(
   // The direction vectors for the face should only have one non-zero
   // coefficient
 
-  return {Face<T>{{T{0}, T{0}, T{0}},
-                  {faces[0].first, T{0}, T{0}},
-                  {T{0}, faces[0].second, T{0}}},
-          Face<T>{{faces[0].first, T{0}, T{0}},
-                  {T{0}, T{0}, faces[1].first},
-                  {T{0}, faces[1].second, T{0}}},
-          Face<T>{ // WARN: May need to swap the first two lines
-                  {/* faces[2].second */
-                   T{0}, faces[0].second, T{0}},
-                  {T{0}, T{0}, faces[2].first},
-                  {/* T{-1} * */ faces[2].second, T{0}, T{0}}}};
+  return {
+      Face<T>{{T{0}, T{0}, T{0}}, {dims[0], T{0}, T{0}}, {T{0}, dims[1], T{0}}},
+      Face<T>{
+          {dims[0], T{0}, T{0}}, {T{0}, dims[1], T{0}}, {T{0}, T{0}, dims[2]}},
+      Face<T>{ // WARN: May need to swap the first two lines
+              {/* faces[2].second */
+               T{0}, dims[1], T{0}},
+              {T{0}, T{0}, dims[2]},
+              {/* T{-1} * */ dims[0], T{0}, T{0}}}};
+}
+
+// /*
+//  * WARN: An assumption has to be made here about the order of the faces and
+//  how
+//  * theyve been inserted
+//  * - The first face will be parallel with the XY plane (vert lying)
+//  * - The second face will be parallel with the YZ plane (vert lying)
+//  * - The third will be parallel with the XZ plane (horiz lying)
+//  */
+// template <typename T>
+// auto get_faces_of_cuboid(
+//     const std::array<std::pair<std::size_t, std::size_t>, 3> &faces)
+//     -> std::array<Face<T>, 3> {
+//   // The cuboid has its front left bottom corner on 0,0,0 and extends right
+//   in
+//   // the X, up the in the Y and forward in the Z
+//   //
+//   // The direction vectors for the face should only have one non-zero
+//   // coefficient
+//
+//   return {Face<T>{{T{0}, T{0}, T{0}},
+//                   {faces[0].first, T{0}, T{0}},
+//                   {T{0}, faces[0].second, T{0}}},
+//           Face<T>{{faces[0].first, T{0}, T{0}},
+//                   {T{0}, faces[1].second, T{0}},
+//                   {T{0}, T{0}, faces[1].first}},
+//           Face<T>{ // WARN: May need to swap the first two lines
+//                   {/* faces[2].second */
+//                    T{0}, faces[0].second, T{0}},
+//                   {T{0}, T{0}, faces[2].first},
+//                   {/* T{-1} * */ faces[2].second, T{0}, T{0}}}};
+// }
+
+template <typename T>
+auto get_position_camera(const std::array<std::size_t, 3> &dims) -> Camera<T> {
+  auto max_hoz_distance = std::max(dims[0], dims[2]);
+
+  auto distance_multipler = 0.8;
+  auto camera_pos =
+      distance_multipler * Vec3<T>{2 * static_cast<T>(max_hoz_distance),
+                                   1.75 * static_cast<T>(dims[1]),
+                                   -1 * static_cast<T>(max_hoz_distance)};
+
+  // INFO: try to set the direction to be the center of the thing
+  auto center_of_cuboid = Vec3<T>{
+      dims[0] / T{2},
+      dims[1] / T{2},
+      dims[2] / T{2},
+  };
+
+  std::cout << "CENTER OF CUBOID: " << stringVec(center_of_cuboid) << std::endl;
+
+  auto camera_angle = center_of_cuboid - camera_pos;
+
+  auto mod = std::sqrt(camera_angle[0] * camera_angle[0] +
+                       camera_angle[1] * camera_angle[1] +
+                       camera_angle[2] * camera_angle[2]);
+
+  camera_angle = {camera_angle[0] / mod, -1 * camera_angle[1] / mod,
+                  camera_angle[2] / mod};
+
+  return Camera<T>{camera_pos, camera_angle};
 }
 
 template <typename T>
 auto get_position_camera(const std::array<Face<T>, 3> &faces) -> Camera<T> {
-  // WARN: Make sure these .first and .second are correct
-  std::cout << "Hoz options: " << faces[0].a[0] << ", " << faces[1].a[2]
-            << std::endl;
   auto max_hoz_distance = std::max(faces[0].a[0], faces[1].a[2]);
   auto shorter_hoz_distance = std::min(faces[0].a[0], faces[1].a[2]);
 
@@ -142,7 +192,7 @@ auto get_position_camera(const std::array<Face<T>, 3> &faces) -> Camera<T> {
   auto center_of_cuboid = Vec3<T>{
       faces[0].a[0] / T{2},
       faces[0].b[1] / T{2},
-      faces[1].a[2] / T{2},
+      faces[1].b[2] / T{2},
   };
 
   std::cout << "CENTER OF CUBOID: " << stringVec(center_of_cuboid) << std::endl;
@@ -212,7 +262,7 @@ auto get_pixel_buffer(
   constexpr auto relevant_coords_per_plane =
       std::array<std::pair<std::size_t, std::size_t>, 3>{{
           {0, 1},
-          {2, 1},
+          {1, 2},
           {2, 0},
       }};
 
