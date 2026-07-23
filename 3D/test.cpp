@@ -6,13 +6,20 @@
 #include <cstddef>
 #include <iostream>
 #include <ostream>
+#include <random>
 #include <vector>
 
 int main() {
   auto data_alloc_start = std::chrono::steady_clock::now();
 
+  auto rand_device = std::random_device{};
+  auto rand_gen = std::mt19937{rand_device()};
+  auto rand_distribution = std::uniform_int_distribution<std::size_t>(1, 2000);
+
   std::vector<double> data;
-  std::array<std::size_t, 3> dims = {432, 500, 750};
+  std::array<std::size_t, 3> dims = {rand_distribution(rand_gen),
+                                     rand_distribution(rand_gen),
+                                     rand_distribution(rand_gen)};
 
   for (int z = dims[2]; z > 0; z--) {
     for (int y = 0; y < dims[1]; y++) {
@@ -21,15 +28,6 @@ int main() {
       }
     }
   }
-  // for (int z = dims[2]; z > 0; z--) {
-  //   for (int y = dims[1]; y > 0; y--) {
-  //     for (int x = dims[0]; x > 0; x--) {
-  //       data.push_back(static_cast<double>(x * y * z));
-  //     }
-  //   }
-  // }
-  // for (int i = 0; i < dims[0] * dims[1] * dims[2]; i++)
-  //   data.push_back(i);
 
   auto data_alloc_end = std::chrono::steady_clock::now();
 
@@ -58,20 +56,21 @@ int main() {
       Cuboid::get_faces_of_cuboid<double>(dims)};
 
   auto camera = Cuboid::get_position_camera<double>(dims);
-  // auto camera = Cuboid::get_position_camera(faces);
 
-  std::cout << "Camera: " << std::endl;
-  std::cout << " O - " << Cuboid::stringVec(camera.origin) << std::endl;
-  std::cout << " D - " << Cuboid::stringVec(camera.direction) << std::endl;
+  constexpr auto CUBOID_RENDER_IMAGE_SIZE =
+      std::pair<std::size_t, std::size_t>{1500, 1500};
 
-  auto test_buffer = Cuboid::get_pixel_buffer(
-      {1000, 1000}, camera, faces,
+  auto cuboid_pixel_buffer = Cuboid::get_pixel_buffer(
+      {CUBOID_RENDER_IMAGE_SIZE.first, CUBOID_RENDER_IMAGE_SIZE.second}, camera,
+      faces,
       {std::get<0>(z_image_and_z_dims), std::get<0>(x_image_and_x_dims),
        std::get<0>(y_image_and_y_dims)},
       {std::get<1>(z_image_and_z_dims), std::get<1>(x_image_and_x_dims),
        std::get<1>(y_image_and_y_dims)});
 
-  Writer::write_bmp("3d_render.bmp", test_buffer, 1000, 1000);
+  Writer::write_bmp("3d_render.bmp", cuboid_pixel_buffer,
+                    CUBOID_RENDER_IMAGE_SIZE.first,
+                    CUBOID_RENDER_IMAGE_SIZE.second);
 
   auto rasteriser_end = std::chrono::steady_clock::now();
 

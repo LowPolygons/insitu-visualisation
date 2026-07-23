@@ -240,31 +240,13 @@ auto get_pixel_buffer(
   auto pixel_increment_y =
       projection_plane_h / static_cast<double>(image_dimensions.second);
 
-  // Camera Pitch and Yaw with (0,0,1) being a forward vector
-  // WARN: making the assumption the direction vector is normalised
+  // WARN: making the assumption the direction vector is normalised, and the
+  // forward vector is (0,0,1)
   auto camera_yaw = std::atan2(camera.direction[0], camera.direction[2]);
   auto camera_pitch =
       std::atan2(camera.direction[1],
                  std::sqrt(camera.direction[0] * camera.direction[0] +
                            camera.direction[2] * camera.direction[2]));
-
-  std::cout << "Camera Yaw (deg): " << camera_yaw * 180 / 3.1415926535
-            << std::endl;
-  std::cout << "Camera Pitch (deg): " << camera_pitch * 180 / 3.1415926535
-            << std::endl;
-
-  /*
-   *
-   * A constexpr array indicating which are the 2 relevant coefficients for
-   * implicit barycentrics
-   *
-   */
-  constexpr auto relevant_coords_per_plane =
-      std::array<std::pair<std::size_t, std::size_t>, 3>{{
-          {1, 0},
-          {1, 2},
-          {2, 0},
-      }};
 
   /*
    *
@@ -366,50 +348,45 @@ auto get_pixel_buffer(
         auto point_of_intersection = a + (lambda * b);
 
         // Determine if it actually lies in the Face
-        auto indexes = relevant_coords_per_plane[face_i];
+        // auto indexes = relevant_coords_per_plane[face_i];
 
         auto local_point_on_surface = point_of_intersection - face.origin;
 
-        if (local_point_on_surface[indexes.first] <= 0 ||
-            local_point_on_surface[indexes.first] >
-                std::abs(face.a[indexes.first]))
+        auto face_a_mod =
+            std::sqrt(face.a[0] * face.a[0] + face.a[1] * face.a[1] +
+                      face.a[2] * face.a[2]);
+        auto face_b_mod =
+            std::sqrt(face.b[0] * face.b[0] + face.b[1] * face.b[1] +
+                      face.b[2] * face.b[2]);
+
+        // As well as perpendicular surfaces, dot product can also indicate in
+        // this scenario How much as a scalar the local position is made up of
+        // the dotted vector
+        //
+        // EG: LocalPos dot A -> how much of LocalPos is made up by A
+        auto lambda_dot =
+            T{local_point_on_surface[0] * (face.a[0] / face_a_mod) +
+              local_point_on_surface[1] * (face.a[1] / face_a_mod) +
+              local_point_on_surface[2] * (face.a[2] / face_a_mod)};
+
+        auto mu_dot = T{local_point_on_surface[0] * (face.b[0] / face_b_mod) +
+                        local_point_on_surface[1] * (face.b[1] / face_b_mod) +
+                        local_point_on_surface[2] * (face.b[2] / face_b_mod)};
+
+        if (!(0 < lambda_dot && lambda_dot <= face_a_mod))
           continue;
 
-        if (local_point_on_surface[indexes.second] <= 0 ||
-            local_point_on_surface[indexes.second] >
-                std::abs(face.b[indexes.second]))
+        if (!(0 < mu_dot && mu_dot <= face_b_mod))
           continue;
 
         // Has hit an object
         has_hit_object = face_i;
-        lambda_mu = {local_point_on_surface[indexes.first],
-                     local_point_on_surface[indexes.second]};
+        lambda_mu = {lambda_dot, mu_dot};
+
         break;
       }
 
       if (has_hit_object != -1) {
-        if (has_hit_object == 0) {
-          // std::cout << "u=" << lambda_mu.first << " v=" << lambda_mu.second
-          //           << " index="
-          //           << (static_cast<size_t>(lambda_mu.first) *
-          //                   image_buffer_dims[0].first +
-          //               static_cast<size_t>(lambda_mu.second))
-          //           << '\n';
-          // std::cout << "[" << pixel_x << ", " << pixel_y
-          //           << "] : " << lambda_mu.first << ", " << lambda_mu.second
-          //           << " [===] " << image_buffer_dims[0].first << ", "
-          //           << image_buffer_dims[0].second << " <=> "
-          //           << image_buffers[0].size() << " and lastly "
-          //           << (static_cast<std::size_t>(lambda_mu.first) *
-          //               image_buffer_dims[has_hit_object].first * 3) +
-          //                  (3 * lambda_mu.second)
-          //           << std::endl;
-          //
-          // pixel_buffer.emplace_back(255);
-          // pixel_buffer.emplace_back(255);
-          // pixel_buffer.emplace_back(255);
-        }
-        // else {
         pixel_buffer.push_back(
             image_buffers[has_hit_object]
                          [(static_cast<std::size_t>(lambda_mu.first) *
@@ -425,7 +402,6 @@ auto get_pixel_buffer(
                          [(static_cast<std::size_t>(lambda_mu.first) *
                            image_buffer_dims[has_hit_object].first * 3) +
                           (3 * lambda_mu.second) + 2]);
-        // }
       } else {
         pixel_buffer.emplace_back(120);
         pixel_buffer.emplace_back(120);

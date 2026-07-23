@@ -9,36 +9,40 @@ BMP files are a little different - the image assumes a decreasing X, Y and Z tra
 
 ## Current Situation
 
-A 300x300x300 block has been generated like this:
+An `I x J x K` block has been generated like this:
 ```cpp
-std::vector<double> data;
+  auto rand_device = std::random_device{};
+  auto rand_gen = std::mt19937{rand_device()};
+  auto rand_distribution = std::uniform_int_distribution<std::size_t>(1, 2000);
 
-std::array<std::size_t, 3> dims = {300, 300, 300};
+  std::vector<double> data;
+  std::array<std::size_t, 3> dims = {rand_distribution(rand_gen),
+                                     rand_distribution(rand_gen),
+                                     rand_distribution(rand_gen)};
 
-for (int z = dims[2]; z > 0; z--) {
-  for (int y = dims[1]; y > 0; y--) {
-    for (int x = dims[0]; x > 0; x--) {
-      data.push_back(static_cast<double>(x * y * z));
+  for (int z = dims[2]; z > 0; z--) {
+    for (int y = 0; y < dims[1]; y++) {
+      for (int x = 0; x < dims[0]; x++) {
+        data.push_back(static_cast<double>(x * y * z));
+      }
     }
   }
-}
 ```
 
-This means in the block space, the bottom, back, left corner is 0 and the top, right, forward corner is 300 * 300 * 300
-
-The following Slices are the 0th slice
+This means that, from the default camera perspective, the hot spot area should be the nearest top corner
 
 
 ### Slices
 
-| X | Y | Z |
+For clarification, an '[AXIS] Slice' means that for every point in the slice, the [AXIS] coefficient will be the same
+
+| X Slice | Y Slice | Z Slice|
 |----------|----------|----------|
 | ![X_Slice](x_slice0.bmp) | ![Y_Slice](y_slice0.bmp) | ![Z_Slice](z_slice0.bmp) |
 
 ### Current 3D Cuboid Render
 
 ![Render](3d_render.bmp)
-
 
 ## Other Issues
 
