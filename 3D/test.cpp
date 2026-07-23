@@ -14,7 +14,7 @@ int main() {
 
   auto rand_device = std::random_device{};
   auto rand_gen = std::mt19937{rand_device()};
-  auto rand_distribution = std::uniform_int_distribution<std::size_t>(1, 2000);
+  auto rand_distribution = std::uniform_int_distribution<std::size_t>(1, 500);
 
   std::vector<double> data;
   std::array<std::size_t, 3> dims = {rand_distribution(rand_gen),
@@ -52,15 +52,15 @@ int main() {
 
   auto rasteriser_start = std::chrono::steady_clock::now();
 
-  auto faces = std::array<Cuboid::Face<double>, 3>{
-      Cuboid::get_faces_of_cuboid<double>(dims)};
+  auto faces = std::array<Renderer::Face<double>, 3>{
+      Renderer::get_faces_of_cuboid<double>(dims)};
 
-  auto camera = Cuboid::get_position_camera<double>(dims);
+  auto camera = Renderer::get_position_camera<double>(dims);
 
   constexpr auto CUBOID_RENDER_IMAGE_SIZE =
       std::pair<std::size_t, std::size_t>{1500, 1500};
 
-  auto cuboid_pixel_buffer = Cuboid::get_pixel_buffer(
+  auto cuboid_pixel_buffer = Renderer::get_pixel_buffer(
       {CUBOID_RENDER_IMAGE_SIZE.first, CUBOID_RENDER_IMAGE_SIZE.second}, camera,
       faces,
       {std::get<0>(z_image_and_z_dims), std::get<0>(x_image_and_x_dims),

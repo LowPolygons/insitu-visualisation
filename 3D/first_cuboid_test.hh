@@ -7,7 +7,82 @@
 #include <iostream>
 #include <ostream>
 #include <vector>
-namespace Cuboid {
+
+namespace Vector3D {
+//==// Vec3 Utility
+template <typename T> using Vec3 = std::array<T, 3>;
+
+template <typename T>
+constexpr auto operator+(const Vec3<T> &a, const Vec3<T> &b) -> Vec3<T> {
+  return {a[0] + b[0], a[1] + b[1], a[2] + b[2]};
+}
+template <typename T>
+constexpr auto operator-(const Vec3<T> &a, const Vec3<T> &b) -> Vec3<T> {
+  return {a[0] - b[0], a[1] - b[1], a[2] - b[2]};
+}
+template <typename T>
+constexpr auto operator*(const Vec3<T> &a, const Vec3<T> &b) -> Vec3<T> {
+  return {a[0] * b[0], a[1] * b[1], a[2] * b[2]};
+}
+// NOTE: this is a vec * scalar overload
+template <typename T>
+constexpr auto operator*(T b, const Vec3<T> &a) -> Vec3<T> {
+  return {a[0] * b, a[1] * b, a[2] * b};
+}
+template <typename T>
+constexpr auto operator/(const Vec3<T> &a, const Vec3<T> &b) -> Vec3<T> {
+  return {a[0] / b[0], a[1] / b[1], a[2] / b[2]};
+}
+// NOTE: this is Vec / scalar
+template <typename T>
+constexpr auto operator/(const Vec3<T> &a, T b) -> Vec3<T> {
+  return {a[0] / b, a[1] / b, a[2] / b};
+}
+template <typename T> auto stringVec(const Vec3<T> &v) -> std::string {
+  return "[" + std::to_string(v[0]) + ", " + std::to_string(v[1]) + ", " +
+         std::to_string(v[2]) + "]";
+}
+
+template <typename T> auto dot(const Vec3<T> &a, const Vec3<T> &b) -> T {
+  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+}
+template <typename T> auto mod(const Vec3<T> &v) -> T {
+  return std::sqrt(dot(v, v));
+}
+
+} // namespace Vector3D
+
+namespace RasteriserComponents {
+using namespace Vector3D;
+template <typename T> struct Face {
+  Vec3<T> origin;
+  Vec3<T> a;
+  Vec3<T> b;
+};
+
+template <typename T> auto printFace(const Face<T> &face) -> void {
+  std::cout << "Face: " << std::endl;
+  std::cout << "- Origin: " << stringVec(face.origin) << std::endl;
+  std::cout << "- Dir Vec A: " << stringVec(face.a) << std::endl;
+  std::cout << "- Dir Vec B: " << stringVec(face.b) << std::endl;
+}
+
+template <typename T> struct Camera {
+  Vec3<T> origin;
+  Vec3<T> direction;
+};
+
+enum class HitSurface {
+  NONE = -1,
+  FIRST = 0,
+  SECOND = 1,
+  THIRD = 2,
+};
+
+} // namespace RasteriserComponents
+namespace Renderer {
+using namespace Vector3D;
+using namespace RasteriserComponents;
 /*
  * Given the three slices dimensions, it needs to calculate the positions in 3D
  * space.
@@ -43,78 +118,6 @@ namespace Cuboid {
  * mashes
  */
 
-//==// Vec3 Utility
-template <typename T> using Vec3 = std::array<T, 3>;
-
-template <typename T>
-constexpr auto operator+(const Vec3<T> &a, const Vec3<T> &b) -> Vec3<T> {
-  return {a[0] + b[0], a[1] + b[1], a[2] + b[2]};
-}
-template <typename T>
-constexpr auto operator-(const Vec3<T> &a, const Vec3<T> &b) -> Vec3<T> {
-  return {a[0] - b[0], a[1] - b[1], a[2] - b[2]};
-}
-template <typename T>
-constexpr auto operator*(const Vec3<T> &a, const Vec3<T> &b) -> Vec3<T> {
-  return {a[0] * b[0], a[1] * b[1], a[2] * b[2]};
-}
-// NOTE: this is a vec + scalar overload
-template <typename T>
-constexpr auto operator*(T b, const Vec3<T> &a) -> Vec3<T> {
-  return {a[0] * b, a[1] * b, a[2] * b};
-}
-template <typename T>
-constexpr auto operator/(const Vec3<T> &a, const Vec3<T> &b) -> Vec3<T> {
-  return {a[0] / b[0], a[1] / b[1], a[2] / b[2]};
-}
-template <typename T> auto stringVec(const Vec3<T> &v) -> std::string {
-  return "[" + std::to_string(v[0]) + ", " + std::to_string(v[1]) + ", " +
-         std::to_string(v[2]) + "]";
-}
-
-/*
- * WARN: Potential subject for change
- *
- * In the workflow, 3 of these are created
- */
-template <typename T> struct Face {
-  Vec3<T> origin;
-  Vec3<T> a;
-  Vec3<T> b;
-};
-
-template <typename T> auto printFace(const Face<T> &face) -> void {
-  std::cout << "Face: " << std::endl;
-  std::cout << "- Origin: " << stringVec(face.origin) << std::endl;
-  std::cout << "- Dir Vec A: " << stringVec(face.a) << std::endl;
-  std::cout << "- Dir Vec B: " << stringVec(face.b) << std::endl;
-}
-
-template <typename T> struct Camera {
-  Vec3<T> origin;
-  Vec3<T> direction;
-};
-
-template <typename T>
-auto get_faces_of_cuboid(const std::array<std::size_t, 3> &dims)
-    -> std::array<Face<T>, 3> {
-  // The cuboid has its front left bottom corner on 0,0,0 and extends right in
-  // the X, up the in the Y and forward in the Z
-  //
-  // The direction vectors for the face should only have one non-zero
-  // coefficient
-
-  return {
-      Face<T>{{T{0}, T{0}, T{0}}, {T{0}, dims[1], T{0}}, {dims[0], T{0}, T{0}}},
-      Face<T>{
-          {dims[0], T{0}, T{0}}, {T{0}, dims[1], T{0}}, {T{0}, T{0}, dims[2]}},
-      Face<T>{ // WARN: May need to swap the first two lines
-              {/* faces[2].second */
-               T{0}, dims[1], T{0}},
-              {T{0}, T{0}, dims[2]},
-              {/* T{-1} * */ dims[0], T{0}, T{0}}}};
-}
-
 // /*
 //  * WARN: An assumption has to be made here about the order of the faces and
 //  how
@@ -123,29 +126,30 @@ auto get_faces_of_cuboid(const std::array<std::size_t, 3> &dims)
 //  * - The second face will be parallel with the YZ plane (vert lying)
 //  * - The third will be parallel with the XZ plane (horiz lying)
 //  */
-// template <typename T>
-// auto get_faces_of_cuboid(
-//     const std::array<std::pair<std::size_t, std::size_t>, 3> &faces)
-//     -> std::array<Face<T>, 3> {
-//   // The cuboid has its front left bottom corner on 0,0,0 and extends right
-//   in
-//   // the X, up the in the Y and forward in the Z
-//   //
-//   // The direction vectors for the face should only have one non-zero
-//   // coefficient
-//
-//   return {Face<T>{{T{0}, T{0}, T{0}},
-//                   {faces[0].first, T{0}, T{0}},
-//                   {T{0}, faces[0].second, T{0}}},
-//           Face<T>{{faces[0].first, T{0}, T{0}},
-//                   {T{0}, faces[1].second, T{0}},
-//                   {T{0}, T{0}, faces[1].first}},
-//           Face<T>{ // WARN: May need to swap the first two lines
-//                   {/* faces[2].second */
-//                    T{0}, faces[0].second, T{0}},
-//                   {T{0}, T{0}, faces[2].first},
-//                   {/* T{-1} * */ faces[2].second, T{0}, T{0}}}};
-// }
+template <typename T>
+auto get_faces_of_cuboid(const std::array<std::size_t, 3> &dims)
+    -> std::array<Face<T>, 3> {
+  auto dims_T =
+      std::array<T, 3>{static_cast<T>(dims[0]), static_cast<T>(dims[1]),
+                       static_cast<T>(dims[2])};
+
+  auto xy_face = Face<T>{};
+  xy_face.origin = {T{0}, T{0}, T{0}};
+  xy_face.a = {T{0}, dims_T[1], T{0}};
+  xy_face.b = {dims_T[0], T{0}, T{0}};
+
+  auto zy_face = Face<T>{};
+  zy_face.origin = {dims_T[0], T{0}, T{0}};
+  zy_face.a = {T{0}, dims_T[1], T{0}};
+  zy_face.b = {T{0}, T{0}, dims_T[2]};
+
+  auto zx_face = Face<T>{};
+  zx_face.origin = {T{0}, dims_T[1], T{0}};
+  zx_face.a = {T{0}, T{0}, dims_T[2]};
+  zx_face.b = {dims_T[0], T{0}, T{0}};
+
+  return {xy_face, zy_face, zx_face};
+}
 
 template <typename T>
 auto get_position_camera(const std::array<std::size_t, 3> &dims) -> Camera<T> {
@@ -157,7 +161,6 @@ auto get_position_camera(const std::array<std::size_t, 3> &dims) -> Camera<T> {
                                    1.75 * static_cast<T>(dims[1]),
                                    -1 * static_cast<T>(max_hoz_distance)};
 
-  // INFO: try to set the direction to be the center of the thing
   auto center_of_cuboid = Vec3<T>{
       dims[0] / T{2},
       dims[1] / T{2},
@@ -168,40 +171,7 @@ auto get_position_camera(const std::array<std::size_t, 3> &dims) -> Camera<T> {
 
   auto camera_angle = center_of_cuboid - camera_pos;
 
-  auto mod = std::sqrt(camera_angle[0] * camera_angle[0] +
-                       camera_angle[1] * camera_angle[1] +
-                       camera_angle[2] * camera_angle[2]);
-
-  camera_angle = {camera_angle[0] / mod, -1 * camera_angle[1] / mod,
-                  camera_angle[2] / mod};
-
-  return Camera<T>{camera_pos, camera_angle};
-}
-
-template <typename T>
-auto get_position_camera(const std::array<Face<T>, 3> &faces) -> Camera<T> {
-  auto max_hoz_distance = std::max(faces[0].a[0], faces[1].a[2]);
-  auto shorter_hoz_distance = std::min(faces[0].a[0], faces[1].a[2]);
-
-  auto distance_multipler = 0.8;
-  auto camera_pos =
-      distance_multipler * Vec3<T>{2 * max_hoz_distance, 1.75 * faces[0].b[1],
-                                   -1 * max_hoz_distance};
-
-  // INFO: try to set the direction to be the center of the thing
-  auto center_of_cuboid = Vec3<T>{
-      faces[0].a[0] / T{2},
-      faces[0].b[1] / T{2},
-      faces[1].b[2] / T{2},
-  };
-
-  std::cout << "CENTER OF CUBOID: " << stringVec(center_of_cuboid) << std::endl;
-
-  auto camera_angle = center_of_cuboid - camera_pos;
-
-  auto mod = std::sqrt(camera_angle[0] * camera_angle[0] +
-                       camera_angle[1] * camera_angle[1] +
-                       camera_angle[2] * camera_angle[2]);
+  auto mod = Vector3D::mod(camera_angle);
 
   camera_angle = {camera_angle[0] / mod, -1 * camera_angle[1] / mod,
                   camera_angle[2] / mod};
@@ -255,16 +225,18 @@ auto get_pixel_buffer(
    */
   auto calculate_normal_and_d_of_face =
       [](const Face<T> &face) -> std::pair<Vec3<T>, T> {
-    auto v = Vec3<T>{face.a[1] * face.b[2] - face.b[1] * face.a[2],
-                     -1 * face.a[0] * face.b[2] + face.b[0] * face.a[2],
-                     face.a[0] * face.b[1] - face.b[0] * face.a[1]};
+    auto surface_normal =
+        Vec3<T>{face.a[1] * face.b[2] - face.b[1] * face.a[2],
+                -1 * face.a[0] * face.b[2] + face.b[0] * face.a[2],
+                face.a[0] * face.b[1] - face.b[0] * face.a[1]};
 
-    auto v_mod = std::sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+    auto normal_mod = Vector3D::mod(surface_normal);
 
-    v = {v[0] / v_mod, v[1] / v_mod, v[2] / v_mod};
+    auto n_hat =
+        Vec3<T>{surface_normal[0] / normal_mod, surface_normal[1] / normal_mod,
+                surface_normal[2] / normal_mod};
 
-    return {v, face.origin[0] * v[0] + face.origin[1] * v[1] +
-                   face.origin[2] * v[2]};
+    return {n_hat, Vector3D::dot(face.origin, n_hat)};
   };
 
   auto pre_calculated_face_normals_and_ds =
@@ -285,7 +257,6 @@ auto get_pixel_buffer(
   for (int pixel_y = 0; pixel_y < image_dimensions.second; pixel_y++) {
     for (int pixel_x = 0; pixel_x < image_dimensions.second; pixel_x++) {
       // Calculate the ray for the current pixel
-
       // Point on projection plane
       auto proj_plane_point = Vec3<double>{
           (pixel_increment_x * pixel_x) - proj_plane_camera_offset_x,
@@ -308,19 +279,12 @@ auto get_pixel_buffer(
               pitched_vec[0] * std::sin(camera_yaw),
       };
 
-      // normalise rotated_dir_vec
-      auto dir_vec_mod = std::sqrt(rotated_dir_vec[0] * rotated_dir_vec[0] +
-                                   rotated_dir_vec[1] * rotated_dir_vec[1] +
-                                   rotated_dir_vec[2] * rotated_dir_vec[2]);
+      // Normalised
+      rotated_dir_vec = rotated_dir_vec / Vector3D::mod(rotated_dir_vec);
 
-      rotated_dir_vec = {rotated_dir_vec[0] / dir_vec_mod,
-                         rotated_dir_vec[1] / dir_vec_mod,
-                         rotated_dir_vec[2] / dir_vec_mod};
+      auto has_hit_object = HitSurface::NONE;
+      auto lambda_mu = std::pair<std::size_t, std::size_t>{0, 0};
 
-      auto has_hit_object = -1;
-      auto lambda_mu = std::pair<std::size_t, size_t>{0, 0};
-
-      // Establish the line and determine if it hits an object
       for (auto face_i = 0; face_i < faces.size(); face_i++) {
 
         auto face = Face<T>{faces[face_i]};
@@ -336,28 +300,20 @@ auto get_pixel_buffer(
         auto &d = face_n_and_d.second;
 
         // Direction vector must not be parallel with surface normal
-        if (std::abs(b[0] * n[0] + b[1] * n[1] + b[2] * n[2]) < 1e-06)
+        if (std::abs(Vector3D::dot(n, b)) < 1e-09)
           continue;
 
-        auto lambda = (d - (a[0] * n[0] + a[1] * n[1] + a[2] * n[2])) /
-                      (b[0] * n[0] + b[1] * n[1] + b[2] * n[2]);
+        auto lambda = (d - (Vector3D::dot(a, n))) / Vector3D::dot(b, n);
 
         if (lambda < 0)
           continue;
 
         auto point_of_intersection = a + (lambda * b);
 
-        // Determine if it actually lies in the Face
-        // auto indexes = relevant_coords_per_plane[face_i];
-
         auto local_point_on_surface = point_of_intersection - face.origin;
 
-        auto face_a_mod =
-            std::sqrt(face.a[0] * face.a[0] + face.a[1] * face.a[1] +
-                      face.a[2] * face.a[2]);
-        auto face_b_mod =
-            std::sqrt(face.b[0] * face.b[0] + face.b[1] * face.b[1] +
-                      face.b[2] * face.b[2]);
+        auto face_a_mod = Vector3D::mod(face.a);
+        auto face_b_mod = Vector3D::mod(face.b);
 
         // As well as perpendicular surfaces, dot product can also indicate in
         // this scenario How much as a scalar the local position is made up of
@@ -365,13 +321,9 @@ auto get_pixel_buffer(
         //
         // EG: LocalPos dot A -> how much of LocalPos is made up by A
         auto lambda_dot =
-            T{local_point_on_surface[0] * (face.a[0] / face_a_mod) +
-              local_point_on_surface[1] * (face.a[1] / face_a_mod) +
-              local_point_on_surface[2] * (face.a[2] / face_a_mod)};
-
-        auto mu_dot = T{local_point_on_surface[0] * (face.b[0] / face_b_mod) +
-                        local_point_on_surface[1] * (face.b[1] / face_b_mod) +
-                        local_point_on_surface[2] * (face.b[2] / face_b_mod)};
+            Vector3D::dot(local_point_on_surface, face.a / face_a_mod);
+        auto mu_dot =
+            Vector3D::dot(local_point_on_surface, face.b / face_b_mod);
 
         if (!(0 < lambda_dot && lambda_dot <= face_a_mod))
           continue;
@@ -380,27 +332,29 @@ auto get_pixel_buffer(
           continue;
 
         // Has hit an object
-        has_hit_object = face_i;
+        has_hit_object = static_cast<HitSurface>(face_i);
         lambda_mu = {lambda_dot, mu_dot};
 
         break;
       }
 
-      if (has_hit_object != -1) {
+      if (has_hit_object != HitSurface::NONE) {
+        auto surf_index = static_cast<std::size_t>(has_hit_object);
+
         pixel_buffer.push_back(
-            image_buffers[has_hit_object]
+            image_buffers[surf_index]
                          [(static_cast<std::size_t>(lambda_mu.first) *
-                           image_buffer_dims[has_hit_object].first * 3) +
+                           image_buffer_dims[surf_index].first * 3) +
                           (3 * lambda_mu.second) + 0]);
         pixel_buffer.push_back(
-            image_buffers[has_hit_object]
+            image_buffers[surf_index]
                          [(static_cast<std::size_t>(lambda_mu.first) *
-                           image_buffer_dims[has_hit_object].first * 3) +
+                           image_buffer_dims[surf_index].first * 3) +
                           (3 * lambda_mu.second) + 1]);
         pixel_buffer.push_back(
-            image_buffers[has_hit_object]
+            image_buffers[surf_index]
                          [(static_cast<std::size_t>(lambda_mu.first) *
-                           image_buffer_dims[has_hit_object].first * 3) +
+                           image_buffer_dims[surf_index].first * 3) +
                           (3 * lambda_mu.second) + 2]);
       } else {
         pixel_buffer.emplace_back(120);
@@ -413,6 +367,6 @@ auto get_pixel_buffer(
   return pixel_buffer;
 }
 
-} // namespace Cuboid
+} // namespace Renderer
 
 #endif
