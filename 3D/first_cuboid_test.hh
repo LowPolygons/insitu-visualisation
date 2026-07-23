@@ -135,18 +135,18 @@ auto get_faces_of_cuboid(const std::array<std::size_t, 3> &dims)
 
   auto xy_face = Face<T>{};
   xy_face.origin = {T{0}, T{0}, T{0}};
-  xy_face.a = {T{0}, dims_T[1], T{0}};
-  xy_face.b = {dims_T[0], T{0}, T{0}};
+  xy_face.a = {dims_T[0], T{0}, T{0}};
+  xy_face.b = {T{0}, dims_T[1], T{0}};
 
   auto zy_face = Face<T>{};
   zy_face.origin = {dims_T[0], T{0}, T{0}};
-  zy_face.a = {T{0}, dims_T[1], T{0}};
-  zy_face.b = {T{0}, T{0}, dims_T[2]};
+  zy_face.a = {T{0}, T{0}, dims_T[2]};
+  zy_face.b = {T{0}, dims_T[1], T{0}};
 
   auto zx_face = Face<T>{};
   zx_face.origin = {T{0}, dims_T[1], T{0}};
-  zx_face.a = {T{0}, T{0}, dims_T[2]};
-  zx_face.b = {dims_T[0], T{0}, T{0}};
+  zx_face.a = {dims_T[0], T{0}, T{0}};
+  zx_face.b = {T{0}, T{0}, dims_T[2]};
 
   return {xy_face, zy_face, zx_face};
 }
@@ -340,22 +340,21 @@ auto get_pixel_buffer(
 
       if (has_hit_object != HitSurface::NONE) {
         auto surf_index = static_cast<std::size_t>(has_hit_object);
-
         pixel_buffer.push_back(
             image_buffers[surf_index]
-                         [(static_cast<std::size_t>(lambda_mu.first) *
-                           image_buffer_dims[surf_index].first * 3) +
-                          (3 * lambda_mu.second) + 0]);
+                         [lambda_mu.second *
+                              (image_buffer_dims[surf_index].first * 3) +
+                          (3 * lambda_mu.first) + 0]);
         pixel_buffer.push_back(
             image_buffers[surf_index]
-                         [(static_cast<std::size_t>(lambda_mu.first) *
-                           image_buffer_dims[surf_index].first * 3) +
-                          (3 * lambda_mu.second) + 1]);
+                         [lambda_mu.second *
+                              (image_buffer_dims[surf_index].first * 3) +
+                          (3 * lambda_mu.first) + 1]);
         pixel_buffer.push_back(
             image_buffers[surf_index]
-                         [(static_cast<std::size_t>(lambda_mu.first) *
-                           image_buffer_dims[surf_index].first * 3) +
-                          (3 * lambda_mu.second) + 2]);
+                         [lambda_mu.second *
+                              (image_buffer_dims[surf_index].first * 3) +
+                          (3 * lambda_mu.first) + 2]);
       } else {
         pixel_buffer.emplace_back(120);
         pixel_buffer.emplace_back(120);
