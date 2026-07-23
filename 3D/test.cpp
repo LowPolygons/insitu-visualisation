@@ -1,6 +1,6 @@
 #include "3D_slice_tracker.hh"
+#include "3d_cuboid_renderer.hh"
 #include "bmp.hh"
-#include "first_cuboid_test.hh"
 #include <array>
 #include <chrono>
 #include <cstddef>
@@ -14,7 +14,7 @@ int main() {
 
   auto rand_device = std::random_device{};
   auto rand_gen = std::mt19937{rand_device()};
-  auto rand_distribution = std::uniform_int_distribution<std::size_t>(1, 500);
+  auto rand_distribution = std::uniform_int_distribution<std::size_t>(50, 1500);
 
   std::vector<double> data;
   std::array<std::size_t, 3> dims = {rand_distribution(rand_gen),

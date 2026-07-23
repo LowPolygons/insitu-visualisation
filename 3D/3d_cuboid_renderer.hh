@@ -72,7 +72,8 @@ template <typename T> struct Camera {
   Vec3<T> direction;
 };
 
-enum class HitSurface {
+enum HitSurface {
+  // Not enum class as this lets us use implicit conversion
   NONE = -1,
   FIRST = 0,
   SECOND = 1,
@@ -83,49 +84,11 @@ enum class HitSurface {
 namespace Renderer {
 using namespace Vector3D;
 using namespace RasteriserComponents;
-/*
- * Given the three slices dimensions, it needs to calculate the positions in 3D
- * space.
- *
- * This can just be the dimensions relative to 0,0
- *
- * Set the camera position to a fixed point (ratio-wise)
- * Calculate the longest length and the height and move it that far up from the
- * top, and that far lengthwise away
- *
- * Can probably mathematically calculate the angle it should look
- *
- * Using that camera position and direction calculate the projection plane and
- * do the standard per pixel operation, defaulting to a colour
- * -> One change is that as soon as a surface is found, it can break from the
- * loop over the objects
- * -> Generally speaking, the first time an object is found to be intersected,
- * it should be moved to the front of the array as it will be colided with more
- *
- * Potential improvements: mathematically calculate the positions of the CORNERS
- * of each face
- * -> do these need to be relative to the projection plane or in broad 3d space?
- * Then calculate a step size in each axis and do a loop to calculate the colour
- * Theoretically reduces all computation to be only on the pixels that will have
- * a mesh
- *
- * Do that last
- *
- * Future optimisations:
- *
- * the computation of where the cuboid is should in theory be constant - perform
- * it once, return some sort of structure and every iteration just map the
- * mashes
- */
 
-// /*
-//  * WARN: An assumption has to be made here about the order of the faces and
-//  how
-//  * theyve been inserted
-//  * - The first face will be parallel with the XY plane (vert lying)
-//  * - The second face will be parallel with the YZ plane (vert lying)
-//  * - The third will be parallel with the XZ plane (horiz lying)
-//  */
+/*
+ * Given the dimensions, this will return an array containing the faces:
+ * {XY Face, ZY Face, XZ Face};
+ */
 template <typename T>
 auto get_faces_of_cuboid(const std::array<std::size_t, 3> &dims)
     -> std::array<Face<T>, 3> {
@@ -143,31 +106,32 @@ auto get_faces_of_cuboid(const std::array<std::size_t, 3> &dims)
   zy_face.a = {T{0}, T{0}, dims_T[2]};
   zy_face.b = {T{0}, dims_T[1], T{0}};
 
-  auto zx_face = Face<T>{};
-  zx_face.origin = {T{0}, dims_T[1], T{0}};
-  zx_face.a = {dims_T[0], T{0}, T{0}};
-  zx_face.b = {T{0}, T{0}, dims_T[2]};
+  auto xz_face = Face<T>{};
+  xz_face.origin = {T{0}, dims_T[1], T{0}};
+  xz_face.a = {dims_T[0], T{0}, T{0}};
+  xz_face.b = {T{0}, T{0}, dims_T[2]};
 
-  return {xy_face, zy_face, zx_face};
+  return {xy_face, zy_face, xz_face};
 }
 
+/*
+ * Given the dimensions of the cuboid, this will return a camera object, pre
+ * position relative to the dimensions of the cuboid, with its angle aiming
+ * towards the center of the cuboid
+ */
 template <typename T>
 auto get_position_camera(const std::array<std::size_t, 3> &dims) -> Camera<T> {
-  auto max_hoz_distance = std::max(dims[0], dims[2]);
 
   auto distance_multipler = 0.8;
-  auto camera_pos =
-      distance_multipler * Vec3<T>{2 * static_cast<T>(max_hoz_distance),
-                                   1.75 * static_cast<T>(dims[1]),
-                                   -1 * static_cast<T>(max_hoz_distance)};
+  auto camera_pos = distance_multipler * Vec3<T>{2 * static_cast<T>(dims[0]),
+                                                 1.75 * static_cast<T>(dims[1]),
+                                                 -1 * static_cast<T>(dims[2])};
 
   auto center_of_cuboid = Vec3<T>{
       dims[0] / T{2},
       dims[1] / T{2},
       dims[2] / T{2},
   };
-
-  std::cout << "CENTER OF CUBOID: " << stringVec(center_of_cuboid) << std::endl;
 
   auto camera_angle = center_of_cuboid - camera_pos;
 
@@ -179,6 +143,19 @@ auto get_position_camera(const std::array<std::size_t, 3> &dims) -> Camera<T> {
   return Camera<T>{camera_pos, camera_angle};
 }
 
+/*
+ * WARN: SRP Violations
+ * TODO: Amend SRP Violations
+ *
+ * Given the Camera, Faces and image metadata, this function will - for each
+ * pixel ->
+ * - Form a 3D line and shoot a ray
+ * - Calculate whether the line intersects with any of the surfaces
+ * - If it does, it will calculate where the point on the face translates to the
+ * colour on the mesh
+ * - Apply the calculated colour to that pixel in the new image
+ * Before returning the pixel buffer of the new image
+ */
 template <typename T>
 auto get_pixel_buffer(
     std::pair<std::size_t, std::size_t> image_dimensions, Camera<T> camera,
@@ -186,44 +163,44 @@ auto get_pixel_buffer(
     const std::array<std::vector<std::uint8_t>, 3> &image_buffers,
     const std::array<std::pair<std::size_t, std::size_t>, 3> &image_buffer_dims)
     -> std::vector<std::uint8_t> {
-  /*
-   * Initialise the pixel buffer
-   */
+
   auto pixel_buffer = std::vector<std::uint8_t>{};
 
   /*
-   *
-   * Camera nonesense (necessary)
-   *
+   * Constants that will be used per-pixel to calculate the correclty rotated
+   * direction vector
    */
+  // INFO: Perhaps make the field of view an argument
   constexpr auto field_of_view = 60 * 3.1415926535 / 180;
-  auto aspect_ratio = image_dimensions.first / image_dimensions.second;
-
-  auto projection_plane_w = tan(field_of_view / 2) * 2;
-  auto projection_plane_h = projection_plane_w / aspect_ratio;
-
-  auto proj_plane_camera_offset_x = projection_plane_w / 2;
-  auto proj_plane_camera_offset_y = projection_plane_h / 2;
-
-  auto pixel_increment_x =
+  const auto aspect_ratio = image_dimensions.first / image_dimensions.second;
+  // The Projection plane can be though of as the pixel buffer, but existing in
+  // 3D space
+  const auto projection_plane_w = tan(field_of_view / 2) * 2;
+  const auto projection_plane_h = projection_plane_w / aspect_ratio;
+  // Just saying that the camera should be position so that the center ray goes
+  // through the center of the projection plane
+  const auto proj_plane_camera_offset_x = projection_plane_w / 2;
+  const auto proj_plane_camera_offset_y = projection_plane_h / 2;
+  // How much of the projection plane's colour will be determined per pixel
+  const auto pixel_increment_x =
       projection_plane_w / static_cast<double>(image_dimensions.first);
-  auto pixel_increment_y =
+  const auto pixel_increment_y =
       projection_plane_h / static_cast<double>(image_dimensions.second);
-
-  // WARN: making the assumption the direction vector is normalised, and the
-  // forward vector is (0,0,1)
-  auto camera_yaw = std::atan2(camera.direction[0], camera.direction[2]);
-  auto camera_pitch =
+  // Camera Pitch and Yaw, assuming the forward vector is (0,0,1)
+  const auto camera_yaw = std::atan2(camera.direction[0], camera.direction[2]);
+  const auto camera_pitch =
       std::atan2(camera.direction[1],
                  std::sqrt(camera.direction[0] * camera.direction[0] +
                            camera.direction[2] * camera.direction[2]));
 
   /*
-   *
-   * Helper method for getting normal and d of a face as a plane
-   *
+   * Helper method which allows the primary computation to use both the
+   *  -> r̲·n̂ = d
+   * form and
+   *  -> o̲ + λa̲ + μb̲
+   * form of a plane
    */
-  auto calculate_normal_and_d_of_face =
+  const auto calculate_normal_and_d_of_face =
       [](const Face<T> &face) -> std::pair<Vec3<T>, T> {
     auto surface_normal =
         Vec3<T>{face.a[1] * face.b[2] - face.b[1] * face.a[2],
@@ -245,25 +222,18 @@ auto get_pixel_buffer(
            calculate_normal_and_d_of_face(faces[1]),
            calculate_normal_and_d_of_face(faces[2])}};
 
-  std::cout << "Image actual dimensions" << std::endl;
-  for (auto thing : image_buffer_dims) {
-    std::cout << thing.first << " x " << thing.second << std::endl;
-  }
-  /*
-   *
-   * Main computation
-   *
-   */
+  // INFO: Main Computation
   for (int pixel_y = 0; pixel_y < image_dimensions.second; pixel_y++) {
     for (int pixel_x = 0; pixel_x < image_dimensions.second; pixel_x++) {
-      // Calculate the ray for the current pixel
-      // Point on projection plane
+      // Pint on projection plane
       auto proj_plane_point = Vec3<double>{
           (pixel_increment_x * pixel_x) - proj_plane_camera_offset_x,
           (pixel_increment_y * pixel_y) - proj_plane_camera_offset_y, 0.0};
 
       auto dir_vector = proj_plane_point - Vec3<T>{T{0}, T{0}, T{-1}};
-      // Skipping roll, but roll would happen here
+
+      /* If the camera were to have a 'roll' rotation, it would be here */
+
       auto pitched_vec =
           Vec3<double>{dir_vector[0],
                        dir_vector[1] * std::cos(camera_pitch) -
@@ -282,15 +252,15 @@ auto get_pixel_buffer(
       // Normalised
       rotated_dir_vec = rotated_dir_vec / Vector3D::mod(rotated_dir_vec);
 
-      auto has_hit_object = HitSurface::NONE;
+      auto hit_surface_status = HitSurface::NONE;
       auto lambda_mu = std::pair<std::size_t, std::size_t>{0, 0};
 
       for (auto face_i = 0; face_i < faces.size(); face_i++) {
-
         auto face = Face<T>{faces[face_i]};
         auto face_n_and_d = pre_calculated_face_normals_and_ds[face_i];
 
-        // Get the point of intersection
+        //=// Get the point of intersection //=//
+
         // Abbreviations to make equation shorter:
         // (a + lambda b) dot n = d
         // solving for lambda
@@ -315,11 +285,7 @@ auto get_pixel_buffer(
         auto face_a_mod = Vector3D::mod(face.a);
         auto face_b_mod = Vector3D::mod(face.b);
 
-        // As well as perpendicular surfaces, dot product can also indicate in
-        // this scenario How much as a scalar the local position is made up of
-        // the dotted vector
-        //
-        // EG: LocalPos dot A -> how much of LocalPos is made up by A
+        // How much of the local position vector is made up by face.a and face.b
         auto lambda_dot =
             Vector3D::dot(local_point_on_surface, face.a / face_a_mod);
         auto mu_dot =
@@ -331,29 +297,30 @@ auto get_pixel_buffer(
         if (!(0 < mu_dot && mu_dot <= face_b_mod))
           continue;
 
-        // Has hit an object
-        has_hit_object = static_cast<HitSurface>(face_i);
+        hit_surface_status = static_cast<HitSurface>(face_i);
         lambda_mu = {lambda_dot, mu_dot};
 
         break;
       }
 
-      if (has_hit_object != HitSurface::NONE) {
-        auto surf_index = static_cast<std::size_t>(has_hit_object);
+      if (hit_surface_status != HitSurface::NONE) {
         pixel_buffer.push_back(
-            image_buffers[surf_index]
+            image_buffers[hit_surface_status]
                          [lambda_mu.second *
-                              (image_buffer_dims[surf_index].first * 3) +
+                              (image_buffer_dims[hit_surface_status].first *
+                               3) +
                           (3 * lambda_mu.first) + 0]);
         pixel_buffer.push_back(
-            image_buffers[surf_index]
+            image_buffers[hit_surface_status]
                          [lambda_mu.second *
-                              (image_buffer_dims[surf_index].first * 3) +
+                              (image_buffer_dims[hit_surface_status].first *
+                               3) +
                           (3 * lambda_mu.first) + 1]);
         pixel_buffer.push_back(
-            image_buffers[surf_index]
+            image_buffers[hit_surface_status]
                          [lambda_mu.second *
-                              (image_buffer_dims[surf_index].first * 3) +
+                              (image_buffer_dims[hit_surface_status].first *
+                               3) +
                           (3 * lambda_mu.first) + 2]);
       } else {
         pixel_buffer.emplace_back(120);
