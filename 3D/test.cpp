@@ -52,13 +52,17 @@ int main() {
 
   auto rasteriser_start = std::chrono::steady_clock::now();
 
-  auto faces = std::array<Renderer::Face<double>, 3>{
-      Renderer::get_faces_of_cuboid<double>(dims)};
-
-  auto camera = Renderer::get_position_camera<double>(dims);
-
   constexpr auto CUBOID_RENDER_IMAGE_SIZE =
       std::pair<std::size_t, std::size_t>{1500, 1500};
+  constexpr auto PERSPECTIVE = RasteriserComponents::CameraPerspective{
+      RasteriserComponents::CameraPerspectiveX::RIGHT,
+      RasteriserComponents::CameraPerspectiveY::UP,
+      RasteriserComponents::CameraPerspectiveZ::BACK};
+
+  auto faces = std::array<Renderer::Face<double>, 3>{
+      Renderer::get_faces_of_cuboid<double>(dims, PERSPECTIVE)};
+
+  auto camera = Renderer::get_position_camera<double>(dims, PERSPECTIVE);
 
   auto cuboid_pixel_buffer = Renderer::get_pixel_buffer(
       {CUBOID_RENDER_IMAGE_SIZE.first, CUBOID_RENDER_IMAGE_SIZE.second}, camera,

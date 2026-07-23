@@ -80,6 +80,16 @@ enum HitSurface {
   THIRD = 2,
 };
 
+enum CameraPerspectiveX { LEFT = -1, RIGHT = 1 };
+enum CameraPerspectiveY { DOWN = -1, UP = 1 };
+enum CameraPerspectiveZ { BACK = -1, FRONT = 1 };
+
+struct CameraPerspective {
+  CameraPerspectiveX x;
+  CameraPerspectiveY y;
+  CameraPerspectiveZ z;
+};
+
 } // namespace RasteriserComponents
 namespace Renderer {
 using namespace Vector3D;
@@ -90,26 +100,44 @@ using namespace RasteriserComponents;
  * {XY Face, ZY Face, XZ Face};
  */
 template <typename T>
-auto get_faces_of_cuboid(const std::array<std::size_t, 3> &dims)
+auto get_faces_of_cuboid(const std::array<std::size_t, 3> &dims,
+                         const CameraPerspective &perspective)
     -> std::array<Face<T>, 3> {
   auto dims_T =
       std::array<T, 3>{static_cast<T>(dims[0]), static_cast<T>(dims[1]),
                        static_cast<T>(dims[2])};
 
   auto xy_face = Face<T>{};
-  xy_face.origin = {T{0}, T{0}, T{0}};
   xy_face.a = {dims_T[0], T{0}, T{0}};
   xy_face.b = {T{0}, dims_T[1], T{0}};
 
   auto zy_face = Face<T>{};
-  zy_face.origin = {dims_T[0], T{0}, T{0}};
   zy_face.a = {T{0}, T{0}, dims_T[2]};
   zy_face.b = {T{0}, dims_T[1], T{0}};
 
   auto xz_face = Face<T>{};
-  xz_face.origin = {T{0}, dims_T[1], T{0}};
   xz_face.a = {dims_T[0], T{0}, T{0}};
   xz_face.b = {T{0}, T{0}, dims_T[2]};
+
+  auto xy_origin = Vec3<T>{T{0}, T{0}, T{0}};
+  auto zy_origin = Vec3<T>{T{0}, T{0}, T{0}};
+  auto xz_origin = Vec3<T>{T{0}, T{0}, T{0}};
+
+  if (perspective.x == CameraPerspectiveX::RIGHT) {
+    zy_origin[0] = dims_T[0];
+  }
+
+  if (perspective.y == CameraPerspectiveY::UP) {
+    xz_origin[1] = dims_T[1];
+  }
+
+  if (perspective.z == CameraPerspectiveZ::FRONT) {
+    xy_origin[2] = dims_T[2];
+  }
+
+  xy_face.origin = xy_origin;
+  zy_face.origin = zy_origin;
+  xz_face.origin = xz_origin;
 
   return {xy_face, zy_face, xz_face};
 }
@@ -120,13 +148,19 @@ auto get_faces_of_cuboid(const std::array<std::size_t, 3> &dims)
  * towards the center of the cuboid
  */
 template <typename T>
-auto get_position_camera(const std::array<std::size_t, 3> &dims) -> Camera<T> {
+auto get_position_camera(const std::array<std::size_t, 3> &dims,
+                         const CameraPerspective &perspective) -> Camera<T> {
 
+  auto dims_T =
+      std::array<T, 3>{static_cast<T>(dims[0]), static_cast<T>(dims[1]),
+                       static_cast<T>(dims[2])};
   auto distance_multipler = 0.8;
-  auto camera_pos = distance_multipler * Vec3<T>{2 * static_cast<T>(dims[0]),
-                                                 1.75 * static_cast<T>(dims[1]),
-                                                 -1 * static_cast<T>(dims[2])};
 
+  auto camera_pos =
+      Vec3<T>{2 * dims_T[0] * perspective.x, 1.75 * dims_T[1] * perspective.y,
+              2.2 * dims_T[2] * perspective.z};
+
+  camera_pos = distance_multipler * camera_pos;
   auto center_of_cuboid = Vec3<T>{
       dims[0] / T{2},
       dims[1] / T{2},
